@@ -3,7 +3,10 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags: []
+  tags:
+  - Enemy
+  - Goal
+  - Wall
   layers:
   - Default
   - TransparentFX
@@ -11,8 +14,8 @@ TagManager:
   - 
   - Water
   - UI
-  - 
-  - 
+  - Wall
+  - EnemyFOV
   - 
   - 
   - 
@@ -41,6 +44,12 @@ TagManager:
   - name: Default
     uniqueID: 0
     locked: 0
-  - name: Player
+  - name: EnemyFOV
+    uniqueID: 3225990571
+    locked: 0
+  - name: Wall
     uniqueID: 1267877049
+    locked: 0
+  - name: Player
+    uniqueID: 2824474189
     locked: 0

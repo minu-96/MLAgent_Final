@@ -2,38 +2,43 @@ using UnityEngine;
 
 public class EnemyController : MonoBehaviour
 {
-    public float moveSpeed = 2.5f;
-    public float chaseSpeed = 3.5f;
-
+    public float chaseSpeed = 3f;
     public Transform player;
+
+    private Rigidbody2D rb;
+    private bool isChasing = false;
+
 
     public GameObject up;
     public GameObject down;
     public GameObject left;
     public GameObject right;
+    public Transform spawn;
 
-    private Rigidbody2D rb;
-    private Vector2 moveDir = Vector2.left;
-    private bool isChasing = false;
+    public GameObject defaltDir;
 
-    void Start()
+    void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
-        SetDirection(moveDir);
+    }
+
+    public void Spawn()
+    {
+        transform.localPosition = spawn.localPosition;
     }
 
     void FixedUpdate()
     {
-        if (isChasing)
+        if (!isChasing)
         {
-            Vector2 dir = (player.position - transform.position).normalized;
-            rb.velocity = dir * chaseSpeed;
-            SetDirection(dir);
+            rb.velocity = Vector2.zero;
+
+            return;
         }
-        else
-        {
-            rb.velocity = moveDir * moveSpeed;
-        }
+
+        Vector2 dir = (player.position - transform.position).normalized;
+        rb.velocity = dir * chaseSpeed;
+        SetDirection(dir);
     }
 
     void SetDirection(Vector2 dir)
@@ -47,5 +52,19 @@ public class EnemyController : MonoBehaviour
     public void StartChase()
     {
         isChasing = true;
+    }
+
+    public void ResetEnemy()
+    {
+        isChasing = false;
+        rb.velocity = Vector2.zero;
+        transform.localPosition = spawn.localPosition;
+
+        up.SetActive(false);
+        down.SetActive(false);
+        left.SetActive(false);
+        right.SetActive(false);
+
+        defaltDir.SetActive(true);
     }
 }
