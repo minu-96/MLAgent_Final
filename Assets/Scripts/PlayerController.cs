@@ -13,16 +13,16 @@ public class PlayerAgent : Agent
     public Transform spawn;
 
     public LayerMask wallLayer;
-    public LayerMask enemyLayer;   // 🔥 Enemy 오브젝트 레이어
+    public LayerMask enemyLayer;   
+    public LayerMask FOVLayer;
 
     public EnemyController[] enemy;
 
     public GameObject up, down, left, right;
 
-    private Vector2 lastMoveDir;
+    private Vector2 lastMoveDir; // 🔑 마지막 이동 방향 = '앞'
     private float prevDistance;
 
-    // 이동 금지 방향 (벽 + 적)
     private Dictionary<Vector2, int> blockedDirTimer = new Dictionary<Vector2, int>();
 
     private readonly Vector2[] dirs =
@@ -32,6 +32,11 @@ public class PlayerAgent : Agent
         Vector2.left,
         Vector2.right
     };
+
+    // 감지 거리
+    private float wallBlockDist = 0.3f;      // 벽 차단 거리
+    private float enemyBlockDist = 0.5f;     // 적 오브젝트 차단 거리
+    private float fovBlockDist = 0.5f;       // 적 시야 차단 거리
 
     void Awake()
     {
@@ -60,20 +65,27 @@ public class PlayerAgent : Agent
         Vector2 toGoal = goal.position - transform.position;
         sensor.AddObservation(toGoal.normalized);
 
-        // 🚧 벽 + 적 4방향 관측
+        // 🚧 벽/적/적시야 감지
         foreach (var d in dirs)
         {
-            bool wallHit = Physics2D.Raycast(transform.position, d, 0.4f, wallLayer);
-            bool enemyHit = Physics2D.Raycast(transform.position, d, 0.6f, enemyLayer);
+            // 월드 기준
+            bool wallHit = Physics2D.Raycast(transform.position, d, wallBlockDist, wallLayer);
+            bool enemyHit = Physics2D.Raycast(transform.position, d, enemyBlockDist, enemyLayer);
+            bool fovHit = Physics2D.Raycast(transform.position, d, fovBlockDist, FOVLayer);
 
             sensor.AddObservation(wallHit ? 1f : 0f);
             sensor.AddObservation(enemyHit ? 1f : 0f);
+            sensor.AddObservation(fovHit ? 1f : 0f);
         }
+
+        // 🔑 마지막 이동 방향도 관측값으로 추가 (앞 방향 정보)
+        Vector2 forward = lastMoveDir == Vector2.zero ? Vector2.up : lastMoveDir;
+        sensor.AddObservation(forward);
     }
 
     public override void OnActionReceived(ActionBuffers actions)
     {
-        // ⏱ 금지 방향 타이머 감소
+        // 금지 방향 타이머 감소
         var keys = new List<Vector2>(blockedDirTimer.Keys);
         foreach (var k in keys)
         {
@@ -97,7 +109,10 @@ public class PlayerAgent : Agent
             return;
         }
 
-        // 🚫 이미 금지된 방향
+        // 🔑 이동 방향 앞 벡터 기준
+        Vector2 forward = lastMoveDir == Vector2.zero ? Vector2.up : lastMoveDir;
+
+        // 이미 금지된 방향
         if (blockedDirTimer.ContainsKey(moveDir))
         {
             rb.velocity = Vector2.zero;
@@ -105,8 +120,8 @@ public class PlayerAgent : Agent
             return;
         }
 
-        // 🚧 벽 감지
-        if (Physics2D.Raycast(transform.position, moveDir, 0.2f, wallLayer))
+        // 벽 감지
+        if (Physics2D.Raycast(transform.position, moveDir, wallBlockDist, wallLayer))
         {
             rb.velocity = Vector2.zero;
             blockedDirTimer[moveDir] = 15;
@@ -114,32 +129,42 @@ public class PlayerAgent : Agent
             return;
         }
 
-        // 👿 적 오브젝트 감지 (핵심)
-        if (Physics2D.Raycast(transform.position, moveDir, 0.3f, enemyLayer))
+        // 적 오브젝트 감지
+        if (Physics2D.Raycast(transform.position, moveDir, enemyBlockDist, enemyLayer))
         {
             rb.velocity = Vector2.zero;
-            blockedDirTimer[moveDir] = 20;   // 벽과 동일하게 취급
+            blockedDirTimer[moveDir] = 20;
+            AddReward(-0.2f);
+            return;
+        }
+
+        // 적 시야 감지
+        if (Physics2D.Raycast(transform.position, moveDir, fovBlockDist, FOVLayer))
+        {
+            rb.velocity = Vector2.zero;
+            blockedDirTimer[moveDir] = 20;
             AddReward(-0.12f);
             return;
         }
 
-        // ✅ 이동
+        // 이동
         rb.velocity = moveDir * moveSpeed;
 
+        // 반복 이동 페널티
         if (moveDir == lastMoveDir)
             AddReward(-0.005f);
 
         lastMoveDir = moveDir;
         UpdateDirectionVisual(moveDir);
 
-        // 🎯 골 거리 보상 (완만)
+        // 거리 기반 보상 (골에 가까워지면 +, 멀어지면 -)
         float currDist = Vector2.Distance(transform.position, goal.position);
         float delta = prevDistance - currDist;
 
         if (delta > 0)
-            AddReward(delta * 0.02f);
+            AddReward(delta * 0.01f);
         else
-            AddReward(-0.01f);
+            AddReward(-0.005f);
 
         prevDistance = currDist;
     }
@@ -148,13 +173,13 @@ public class PlayerAgent : Agent
     {
         if (col.gameObject.CompareTag("Goal"))
         {
-            AddReward(+1f);
+            AddReward(+1.5f);
             EndEpisode();
         }
 
         if (col.gameObject.CompareTag("Enemy"))
         {
-            AddReward(-1f);
+            AddReward(-2f);
             EndEpisode();
         }
     }
