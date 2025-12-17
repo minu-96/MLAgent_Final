@@ -1,0 +1,38 @@
+{
+    "StealthAgent": {
+        "checkpoints": [
+            {
+                "steps": 17421,
+                "file_path": "results\\ppo\\StealthAgent\\StealthAgent-17421.onnx",
+                "reward": -37.11472845077515,
+                "creation_time": 1765938600.139695,
+                "auxillary_file_paths": [
+                    "results\\ppo\\StealthAgent\\StealthAgent-17421.pt"
+                ]
+            },
+            {
+                "steps": 301133,
+                "file_path": "results\\ppo\\StealthAgent\\StealthAgent-301133.onnx",
+                "reward": -5.769552288190374,
+                "creation_time": 1765938933.6384923,
+                "auxillary_file_paths": [
+                    "results\\ppo\\StealthAgent\\StealthAgent-301133.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 301133,
+            "file_path": "results\\ppo\\StealthAgent.onnx",
+            "reward": -5.769552288190374,
+            "creation_time": 1765938933.6384923,
+            "auxillary_file_paths": [
+                "results\\ppo\\StealthAgent\\StealthAgent-301133.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "0.27.0",
+        "torch_version": "2.0.0+cu118"
+    }
+}

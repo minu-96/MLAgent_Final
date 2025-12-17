@@ -2,6 +2,7 @@ using UnityEngine;
 using Unity.MLAgents;
 using Unity.MLAgents.Actuators;
 using Unity.MLAgents.Sensors;
+using System.Collections.Generic;
 
 public class PlayerAgent : Agent
 {
@@ -9,19 +10,28 @@ public class PlayerAgent : Agent
     private Rigidbody2D rb;
 
     public Transform goal;
-    public LayerMask enemyFOVLayer;
-    public LayerMask wallLayer;
+    public Transform spawn;
 
-    private Vector2 moveDir;
-    private Vector2 lastPos;
+    public LayerMask wallLayer;
+    public LayerMask enemyLayer;   // 🔥 Enemy 오브젝트 레이어
 
     public EnemyController[] enemy;
 
-    public Transform spawn;
+    public GameObject up, down, left, right;
 
-    private float prevDistance;
-    private int sameDirCount;
     private Vector2 lastMoveDir;
+    private float prevDistance;
+
+    // 이동 금지 방향 (벽 + 적)
+    private Dictionary<Vector2, int> blockedDirTimer = new Dictionary<Vector2, int>();
+
+    private readonly Vector2[] dirs =
+    {
+        Vector2.up,
+        Vector2.down,
+        Vector2.left,
+        Vector2.right
+    };
 
     void Awake()
     {
@@ -36,69 +46,101 @@ public class PlayerAgent : Agent
         foreach (var e in enemy)
             e.ResetEnemy();
 
-        enemy[Random.Range(0, enemy.Length)].SpawnEnemy();
+        if (enemy.Length > 0)
+            enemy[Random.Range(0, enemy.Length)].SpawnEnemy();
 
         prevDistance = Vector2.Distance(transform.position, goal.position);
-        lastPos = transform.position;
         lastMoveDir = Vector2.zero;
-        sameDirCount = 0;
+        blockedDirTimer.Clear();
     }
 
     public override void CollectObservations(VectorSensor sensor)
     {
+        // 🎯 목표 방향
         Vector2 toGoal = goal.position - transform.position;
         sensor.AddObservation(toGoal.normalized);
 
-        Vector2[] dirs = { Vector2.up, Vector2.down, Vector2.left, Vector2.right };
-
-        foreach (var dir in dirs)
+        // 🚧 벽 + 적 4방향 관측
+        foreach (var d in dirs)
         {
-            bool wall = Physics2D.Raycast(transform.position, dir, 0.6f, wallLayer);
-            sensor.AddObservation(wall ? 1f : 0f);
+            bool wallHit = Physics2D.Raycast(transform.position, d, 0.4f, wallLayer);
+            bool enemyHit = Physics2D.Raycast(transform.position, d, 0.6f, enemyLayer);
 
-            // 🔑 핵심: 이 방향으로 갔을 때 거리 변화
-            Vector2 futurePos = (Vector2)transform.position + dir * 0.5f;
-            float futureDist = Vector2.Distance(futurePos, goal.position);
-            sensor.AddObservation(prevDistance - futureDist);
+            sensor.AddObservation(wallHit ? 1f : 0f);
+            sensor.AddObservation(enemyHit ? 1f : 0f);
         }
     }
 
     public override void OnActionReceived(ActionBuffers actions)
     {
-        int action = actions.DiscreteActions[0];
-        moveDir = Vector2.zero;
-
-        if (action == 1) moveDir = Vector2.up;
-        else if (action == 2) moveDir = Vector2.down;
-        else if (action == 3) moveDir = Vector2.left;
-        else if (action == 4) moveDir = Vector2.right;
-
-        rb.velocity = moveDir * moveSpeed;
-
-        AddReward(-0.001f);
-
-        float currDist = Vector2.Distance(transform.position, goal.position);
-
-        if (moveDir != Vector2.zero)
+        // ⏱ 금지 방향 타이머 감소
+        var keys = new List<Vector2>(blockedDirTimer.Keys);
+        foreach (var k in keys)
         {
-            bool wallAhead = Physics2D.Raycast(transform.position, moveDir, 0.5f, wallLayer);
-
-            if (wallAhead)
-                AddReward(-0.1f);
-            else
-                AddReward((prevDistance - currDist) * 0.2f);
+            blockedDirTimer[k]--;
+            if (blockedDirTimer[k] <= 0)
+                blockedDirTimer.Remove(k);
         }
 
-        // 🌀 같은 방향 반복 패널티
-        if (moveDir == lastMoveDir)
-            sameDirCount++;
-        else
-            sameDirCount = 0;
+        AddReward(-0.001f); // 시간 패널티
 
-        if (sameDirCount > 15)
-            AddReward(-0.08f);
+        int action = actions.DiscreteActions[0];
+        Vector2 moveDir = Vector2.zero;
+
+        if (action >= 1 && action <= 4)
+            moveDir = dirs[action - 1];
+
+        if (moveDir == Vector2.zero)
+        {
+            rb.velocity = Vector2.zero;
+            AddReward(-0.01f);
+            return;
+        }
+
+        // 🚫 이미 금지된 방향
+        if (blockedDirTimer.ContainsKey(moveDir))
+        {
+            rb.velocity = Vector2.zero;
+            AddReward(-0.05f);
+            return;
+        }
+
+        // 🚧 벽 감지
+        if (Physics2D.Raycast(transform.position, moveDir, 0.2f, wallLayer))
+        {
+            rb.velocity = Vector2.zero;
+            blockedDirTimer[moveDir] = 15;
+            AddReward(-0.1f);
+            return;
+        }
+
+        // 👿 적 오브젝트 감지 (핵심)
+        if (Physics2D.Raycast(transform.position, moveDir, 0.3f, enemyLayer))
+        {
+            rb.velocity = Vector2.zero;
+            blockedDirTimer[moveDir] = 20;   // 벽과 동일하게 취급
+            AddReward(-0.12f);
+            return;
+        }
+
+        // ✅ 이동
+        rb.velocity = moveDir * moveSpeed;
+
+        if (moveDir == lastMoveDir)
+            AddReward(-0.005f);
 
         lastMoveDir = moveDir;
+        UpdateDirectionVisual(moveDir);
+
+        // 🎯 골 거리 보상 (완만)
+        float currDist = Vector2.Distance(transform.position, goal.position);
+        float delta = prevDistance - currDist;
+
+        if (delta > 0)
+            AddReward(delta * 0.02f);
+        else
+            AddReward(-0.01f);
+
         prevDistance = currDist;
     }
 
@@ -115,5 +157,24 @@ public class PlayerAgent : Agent
             AddReward(-1f);
             EndEpisode();
         }
+    }
+
+    void UpdateDirectionVisual(Vector2 dir)
+    {
+        if (up) up.SetActive(dir == Vector2.up);
+        if (down) down.SetActive(dir == Vector2.down);
+        if (left) left.SetActive(dir == Vector2.left);
+        if (right) right.SetActive(dir == Vector2.right);
+    }
+
+    public override void Heuristic(in ActionBuffers actionsOut)
+    {
+        var a = actionsOut.DiscreteActions;
+        a[0] = 0;
+
+        if (Input.GetKey(KeyCode.W)) a[0] = 1;
+        if (Input.GetKey(KeyCode.S)) a[0] = 2;
+        if (Input.GetKey(KeyCode.A)) a[0] = 3;
+        if (Input.GetKey(KeyCode.D)) a[0] = 4;
     }
 }

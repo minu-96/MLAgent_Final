@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 7230087570503455367}
   - component: {fileID: 1618262131733246381}
   - component: {fileID: 7826935405302119478}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: Enemy
   m_TagString: Enemy
   m_Icon: {fileID: 0}
@@ -57,6 +57,8 @@ MonoBehaviour:
   left: {fileID: 7568092179245692567}
   right: {fileID: 249046872950334823}
   spawn: {fileID: 0}
+  enemy: {fileID: 0}
+  defaltDir: {fileID: 0}
 --- !u!50 &1618262131733246381
 Rigidbody2D:
   serializedVersion: 4
