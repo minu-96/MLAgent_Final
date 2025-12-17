@@ -15,6 +15,8 @@ public class EnemyController : MonoBehaviour
     public GameObject right;
     public Transform spawn;
 
+    public GameObject enemy;
+
     public GameObject defaltDir;
 
     void Awake()
@@ -54,6 +56,17 @@ public class EnemyController : MonoBehaviour
         isChasing = true;
     }
 
+    public void StopChase()
+    {
+        isChasing = false;
+    }
+
+    public void SpawnEnemy()
+    {
+        defaltDir.SetActive(true);
+        enemy.SetActive(true);
+    }
+
     public void ResetEnemy()
     {
         isChasing = false;
@@ -65,6 +78,6 @@ public class EnemyController : MonoBehaviour
         left.SetActive(false);
         right.SetActive(false);
 
-        defaltDir.SetActive(true);
+        enemy.SetActive(false);
     }
 }

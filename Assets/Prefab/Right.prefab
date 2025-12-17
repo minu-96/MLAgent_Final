@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 2947269725364987694}
   - component: {fileID: 6177523552278784190}
   - component: {fileID: 8112102350094570271}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Right
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -121,8 +121,9 @@ EdgeCollider2D:
   m_Offset: {x: 0, y: 0}
   m_EdgeRadius: 0
   m_Points:
-  - {x: 4.986309, y: -12.768331}
+  - {x: 4.9958878, y: -12.830597}
   - {x: -0.33380127, y: -3.8291411}
+  - {x: 0.9921785, y: -2.7006762}
   - {x: 2.0155418, y: -0.11000967}
   - {x: -0.17060184, y: 3.8682573}
   - {x: 5.059766, y: 12.894503}
@@ -134,7 +135,7 @@ EdgeCollider2D:
   - {x: 10.2457075, y: -7.5432663}
   - {x: 7.9288507, y: -10.753411}
   - {x: 5.0314784, y: -12.837842}
-  - {x: 4.05462, y: -10.230923}
+  - {x: 4.854778, y: -10.631003}
   m_AdjacentStartPoint: {x: 0, y: 0}
   m_AdjacentEndPoint: {x: 0, y: 0}
   m_UseAdjacentStartPoint: 0

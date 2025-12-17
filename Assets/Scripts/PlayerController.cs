@@ -13,15 +13,15 @@ public class PlayerAgent : Agent
     public LayerMask wallLayer;
 
     private Vector2 moveDir;
+    private Vector2 lastPos;
 
     public EnemyController[] enemy;
 
-    public GameObject up;
-    public GameObject down;
-    public GameObject left;
-    public GameObject right;
-
     public Transform spawn;
+
+    private float prevDistance;
+    private int sameDirCount;
+    private Vector2 lastMoveDir;
 
     void Awake()
     {
@@ -30,34 +30,37 @@ public class PlayerAgent : Agent
 
     public override void OnEpisodeBegin()
     {
-        // 위치 리셋
         rb.velocity = Vector2.zero;
         transform.localPosition = spawn.localPosition;
 
-        int j = enemy.Length;
-        int r = Random.Range(0, j);
-        //for (int i = 0; i < j; i++)
-        //{
-            enemy[r].ResetEnemy();
-            enemy[r].Spawn();
-        //}
+        foreach (var e in enemy)
+            e.ResetEnemy();
+
+        enemy[Random.Range(0, enemy.Length)].SpawnEnemy();
+
+        prevDistance = Vector2.Distance(transform.position, goal.position);
+        lastPos = transform.position;
+        lastMoveDir = Vector2.zero;
+        sameDirCount = 0;
     }
 
     public override void CollectObservations(VectorSensor sensor)
     {
-        // 목표 방향
         Vector2 toGoal = goal.position - transform.position;
         sensor.AddObservation(toGoal.normalized);
 
-        // Raycast (앞 방향 위험 감지)
-        RaycastHit2D hit = Physics2D.Raycast(
-            transform.position,
-            moveDir == Vector2.zero ? Vector2.down : moveDir,
-            2f,
-            enemyFOVLayer | wallLayer
-        );
+        Vector2[] dirs = { Vector2.up, Vector2.down, Vector2.left, Vector2.right };
 
-        sensor.AddObservation(hit.collider != null ? 1f : 0f);
+        foreach (var dir in dirs)
+        {
+            bool wall = Physics2D.Raycast(transform.position, dir, 0.6f, wallLayer);
+            sensor.AddObservation(wall ? 1f : 0f);
+
+            // 🔑 핵심: 이 방향으로 갔을 때 거리 변화
+            Vector2 futurePos = (Vector2)transform.position + dir * 0.5f;
+            float futureDist = Vector2.Distance(futurePos, goal.position);
+            sensor.AddObservation(prevDistance - futureDist);
+        }
     }
 
     public override void OnActionReceived(ActionBuffers actions)
@@ -65,58 +68,52 @@ public class PlayerAgent : Agent
         int action = actions.DiscreteActions[0];
         moveDir = Vector2.zero;
 
-        // 🔑 입력 없으면 이동 X
-        switch (action)
-        {
-            case 1: moveDir = Vector2.up; break;
-            case 2: moveDir = Vector2.down; break;
-            case 3: moveDir = Vector2.left; break;
-            case 4: moveDir = Vector2.right; break;
-        }
+        if (action == 1) moveDir = Vector2.up;
+        else if (action == 2) moveDir = Vector2.down;
+        else if (action == 3) moveDir = Vector2.left;
+        else if (action == 4) moveDir = Vector2.right;
 
         rb.velocity = moveDir * moveSpeed;
 
-        // 기본 시간 패널티 (가만히 있어도 손해)
         AddReward(-0.001f);
-    }
 
-    public override void Heuristic(in ActionBuffers actionsOut)
-    {
-        var actions = actionsOut.DiscreteActions;
-        actions[0] = 0;
+        float currDist = Vector2.Distance(transform.position, goal.position);
 
-        if (Input.GetKey(KeyCode.W)) actions[0] = 1;
-        else if (Input.GetKey(KeyCode.S)) actions[0] = 2;
-        else if (Input.GetKey(KeyCode.A)) actions[0] = 3;
-        else if (Input.GetKey(KeyCode.D)) actions[0] = 4;
-
-        if (actions[0] != 0)
+        if (moveDir != Vector2.zero)
         {
-            SetDirection(actions[0]);
+            bool wallAhead = Physics2D.Raycast(transform.position, moveDir, 0.5f, wallLayer);
+
+            if (wallAhead)
+                AddReward(-0.1f);
+            else
+                AddReward((prevDistance - currDist) * 0.2f);
         }
+
+        // 🌀 같은 방향 반복 패널티
+        if (moveDir == lastMoveDir)
+            sameDirCount++;
+        else
+            sameDirCount = 0;
+
+        if (sameDirCount > 15)
+            AddReward(-0.08f);
+
+        lastMoveDir = moveDir;
+        prevDistance = currDist;
     }
 
     void OnCollisionEnter2D(Collision2D col)
     {
         if (col.gameObject.CompareTag("Goal"))
         {
-            AddReward(+1.0f);
+            AddReward(+1f);
             EndEpisode();
         }
 
         if (col.gameObject.CompareTag("Enemy"))
         {
-            Debug.Log("end");
-            AddReward(-1.0f);
+            AddReward(-1f);
             EndEpisode();
         }
     }
-    void SetDirection(int dir)
-    {
-        up.SetActive(dir == 1);
-        down.SetActive(dir == 2);
-        left.SetActive(dir == 3);
-        right.SetActive(dir == 4);
-    }
-
 }
